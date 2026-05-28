@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LinguaAI Translator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:#1e1e2e;
+    color:#cdd6f4;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:30px 20px;
+  }
+  .card{
+    width:100%;
+    max-width:780px;
+    background:#181825;
+    border:1px solid #313244;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,0.5);
+  }
+  /* HEADER */
+  .header{
+    padding:18px 24px;
+    border-bottom:1px solid #313244;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:#1e1e2e;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-icon{
+    width:34px;height:34px;border-radius:8px;
+    background:linear-gradient(135deg,#89b4fa,#cba6f7);
+    display:flex;align-items:center;justify-content:center;
+    font-size:17px;
+  }
+  .brand-name{font-size:15px;font-weight:700;color:#cdd6f4;letter-spacing:-.3px;}
+  .brand-sub{font-size:11px;color:#6c7086;margin-top:1px;}
+  .status{display:flex;align-items:center;gap:6px;font-size:11px;color:#6c7086;}
+  .status-dot{width:7px;height:7px;border-radius:50%;background:#a6e3a1;}
+  /* LANG ROW */
+  .lang-row{
+    padding:14px 24px;
+    border-bottom:1px solid #313244;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#1e1e2e;
+  }
+  .lang-box{flex:1;position:relative;}
+  .lang-flag{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;z-index:1;}
+  select{
+    width:100%;
+    background:#313244;
+    border:1px solid #45475a;
+    border-radius:9px;
+    padding:9px 10px 9px 36px;
+    color:#cdd6f4;
+    font-size:13px;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    outline:none;
+    appearance:none;
+    transition:border-color .2s;
+  }
+  select:focus{border-color:#89b4fa;}
+  select option{background:#313244;color:#cdd6f4;}
+  .swap-btn{
+    width:38px;height:38px;border-radius:50%;
+    background:#313244;border:1px solid #45475a;
+    color:#89b4fa;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .25s;flex-shrink:0;
+  }
+  .swap-btn:hover:not(:disabled){background:#89b4fa;color:#1e1e2e;transform:rotate(180deg);}
+  .swap-btn:disabled{color:#45475a;cursor:not-allowed;}
+  /* PANELS */
+  .panels{display:grid;grid-template-columns:1fr 1fr;}
+  .panel{display:flex;flex-direction:column;}
+  .panel:first-child{border-right:1px solid #313244;}
+  .panel-header{
+    padding:11px 16px;
+    border-bottom:1px solid #313244;
+    background:#1e1e2e;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .panel-label{display:flex;align-items:center;gap:7px;}
+  .panel-flag{font-size:15px;}
+  .panel-name{font-size:11px;font-weight:700;color:#6c7086;letter-spacing:.6px;}
+  .ready-dot{width:6px;height:6px;border-radius:50%;background:#a6e3a1;display:none;animation:blink 2s infinite;}
+  textarea{
+    flex:1;min-height:200px;
+    background:transparent;border:none;
+    color:#cdd6f4;font-size:14px;line-height:1.8;
+    padding:16px;resize:none;outline:none;
+    font-family:'Inter',sans-serif;
+  }
+  textarea::placeholder{color:#45475a;}
+  #outputBox{
+    flex:1;min-height:200px;
+    font-size:14px;line-height:1.8;color:#cdd6f4;
+    overflow-y:auto;
+    position:relative;
+    background:#181825;
+  }
+  #resultText{
+    background:transparent;
+    margin:0;padding:16px;
+    white-space:pre-wrap;
+    vertical-align:top;
+  }
+  .empty-state{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:8px;color:#45475a;font-size:13px;
+  }
+  .empty-icon{font-size:28px;opacity:.4;}
+  /* FOOTERS */
+  .panel-footer{
+    padding:10px 16px;
+    border-top:1px solid #313244;
+    background:#1e1e2e;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+  }
+  .speak-btn{
+    display:flex;align-items:center;gap:6px;
+    background:#313244;border:1px solid #45475a;
+    border-radius:8px;padding:7px 14px;
+    color:#89b4fa;font-size:12px;font-weight:600;
+    cursor:pointer;font-family:'Inter',sans-serif;
+    transition:all .2s;
+  }
+  .speak-btn:hover:not(:disabled){background:#89b4fa;color:#1e1e2e;border-color:#89b4fa;}
+  .speak-btn:disabled{opacity:.3;cursor:not-allowed;}
+  .speak-btn.playing{background:linear-gradient(135deg,#89b4fa,#cba6f7);border-color:transparent;color:#1e1e2e;}
+  .waves{display:flex;gap:2px;align-items:flex-end;height:14px;}
+  .wb{width:2.5px;border-radius:2px;background:currentColor;animation:wave .7s infinite;}
+  .wb:nth-child(2){animation-delay:.15s;}
+  .wb:nth-child(3){animation-delay:.3s;}
+  .char-info{font-size:11px;color:#45475a;}
+  .translate-btn{
+    background:linear-gradient(135deg,#89b4fa,#cba6f7);
+    border:none;border-radius:9px;
+    padding:8px 20px;color:#1e1e2e;
+    font-size:13px;font-weight:700;
+    cursor:pointer;font-family:'Inter',sans-serif;
+    transition:all .2s;display:flex;align-items:center;gap:7px;
+  }
+  .translate-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(137,180,250,.3);}
+  .translate-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+  .spin{width:12px;height:12px;border:2px solid rgba(30,30,46,.4);border-top:2px solid #1e1e2e;border-radius:50%;animation:spin .6s linear infinite;display:none;}
+  .copy-btn{
+    display:flex;align-items:center;gap:6px;
+    background:#313244;border:1px solid #45475a;
+    border-radius:8px;padding:7px 14px;
+    color:#a6e3a1;font-size:12px;font-weight:600;
+    cursor:pointer;font-family:'Inter',sans-serif;
+    transition:all .2s;
+  }
+  .copy-btn:hover:not(:disabled){background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1;}
+  .copy-btn:disabled{opacity:.3;cursor:not-allowed;}
+  .copy-btn.done{background:#a6e3a1;color:#1e1e2e;border-color:#a6e3a1;}
+  /* ERROR */
+  #errorBar{
+    display:none;padding:10px 24px;
+    background:rgba(243,139,168,.08);
+    border-top:1px solid rgba(243,139,168,.2);
+    color:#f38ba8;font-size:12px;
+    text-align:center;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes wave{0%,100%{height:3px;}50%{height:12px;}}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  @media(max-width:560px){
+    .panels{grid-template-columns:1fr;} 
+    .panel:first-child{border-right:none;border-bottom:1px solid #313244;}
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">🌐</div>
+      <div>
+        <div class="brand-name">LinguaAI</div>
+        <div class="brand-sub">AI Language Translator</div>
+      </div>
+    </div>
+    <div class="status">
+      <div class="status-dot"></div>
+      AI Engine · 23 Languages
+    </div>
+  </div>
+  <div class="lang-row">
+    <div class="lang-box">
+      <span class="lang-flag" id="srcFlag">🌐</span>
+      <select id="srcLang">
+        <option value="auto">Detect Language</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="ur">🇵🇰 Urdu</option>
+        <option value="ar">🇸🇦 Arabic</option>
+        <option value="fr">🇫🇷 French</option>
+        <option value="de">🇩🇪 German</option>
+        <option value="es">🇪🇸 Spanish</option>
+        <option value="it">🇮🇹 Italian</option>
+        <option value="pt">🇵🇹 Portuguese</option>
+        <option value="ru">🇷🇺 Russian</option>
+        <option value="zh">🇨🇳 Chinese</option>
+        <option value="ja">🇯🇵 Japanese</option>
+        <option value="ko">🇰🇷 Korean</option>
+        <option value="hi">🇮🇳 Hindi</option>
+        <option value="tr">🇹🇷 Turkish</option>
+        <option value="nl">🇳🇱 Dutch</option>
+        <option value="pl">🇵🇱 Polish</option>
+        <option value="sv">🇸🇪 Swedish</option>
+        <option value="id">🇮🇩 Indonesian</option>
+        <option value="th">🇹🇭 Thai</option>
+        <option value="vi">🇻🇳 Vietnamese</option>
+        <option value="fa">🇮🇷 Persian</option>
+        <option value="he">🇮🇱 Hebrew</option>
+        <option value="bn">🇧🇩 Bengali</option>
+      </select>
+    </div>
+    <button class="swap-btn" id="swapBtn" disabled title="Swap languages">⇄</button>
+    <div class="lang-box">
+      <span class="lang-flag" id="tgtFlag">🇪🇸</span>
+      <select id="tgtLang">
+        <option value="en">🇬🇧 English</option>
+        <option value="ur">🇵🇰 Urdu</option>
+        <option value="ar">🇸🇦 Arabic</option>
+        <option value="fr">🇫🇷 French</option>
+        <option value="de">🇩🇪 German</option>
+        <option value="es" selected>🇪🇸 Spanish</option>
+        <option value="it">🇮🇹 Italian</option>
+        <option value="pt">🇵🇹 Portuguese</option>
+        <option value="ru">🇷🇺 Russian</option>
+        <option value="zh">🇨🇳 Chinese</option>
+        <option value="ja">🇯🇵 Japanese</option>
+        <option value="ko">🇰🇷 Korean</option>
+        <option value="hi">🇮🇳 Hindi</option>
+        <option value="tr">🇹🇷 Turkish</option>
+        <option value="nl">🇳🇱 Dutch</option>
+        <option value="pl">🇵🇱 Polish</option>
+        <option value="sv">🇸🇪 Swedish</option>
+        <option value="id">🇮🇩 Indonesian</option>
+        <option value="th">🇹🇭 Thai</option>
+        <option value="vi">🇻🇳 Vietnamese</option>
+        <option value="fa">🇮🇷 Persian</option>
+        <option value="he">🇮🇱 Hebrew</option>
+        <option value="bn">🇧🇩 Bengali</option>
+      </select>
+    </div>
+  </div>
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="panel-flag" id="srcPanelFlag">🌐</span>
+          <span class="panel-name" id="srcPanelName">SOURCE</span>
+        </div>
+      </div>
+      <textarea id="sourceText" placeholder="Enter text to translate…" maxlength="2000"></textarea>
+      <div class="panel-footer">
+        <button class="speak-btn" id="srcSpeakBtn" onclick="speak('src')" disabled>
+          <span>🔊</span> Listen
+        </button>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="char-info" id="charCount">0 / 2000</span>
+          <button class="translate-btn" id="translateBtn" onclick="doTranslate()" disabled>
+            <div class="spin" id="spin"></div>
+            <span id="btnLabel">Translate →</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="panel-flag" id="tgtPanelFlag">🇪🇸</span>
+          <span class="panel-name" id="tgtPanelName">SPANISH</span>
+          <span class="ready-dot" id="readyDot"></span>
+        </div>
+      </div>
+      <div id="outputBox">
+        <p id="resultText" style="display:none;animation:fadeUp .35s ease;"></p>
+        <div class="empty-state" id="emptyState">
+          <span class="empty-icon">💬</span>
+          Translation appears here
+        </div>
+        <div id="loadingState" style="display:none;" class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="#313244" stroke-width="3"/><path d="M16 4 A12 12 0 0 1 28 16" fill="none" stroke="#89b4fa" stroke-width="3" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.8s" repeatCount="indefinite"/></path></svg>
+          <span style="color:#6c7086;font-size:13px;">Translating…</span>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <button class="speak-btn" id="tgtSpeakBtn" onclick="speak('tgt')" disabled>
+          <span>🔊</span> Listen
+        </button>
+        <button class="copy-btn" id="copyBtn" onclick="copyResult()" disabled>
+          📋 Copy
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="errorBar"></div>
+</div>
+
+<script>
+const FLAGS = {auto:"🌐",en:"🇬🇧",ur:"🇵🇰",ar:"🇸🇦",fr:"🇫🇷",de:"🇩🇪",es:"🇪🇸",it:"🇮🇹",pt:"🇵🇹",ru:"🇷🇺",zh:"🇨🇳",ja:"🇯🇵",ko:"🇰🇷",hi:"🇮🇳",tr:"🇹🇷",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",id:"🇮🇩",th:"🇹🇭",vi:"🇻🇳",fa:"🇮🇷",he:"🇮🇱",bn:"🇧🇩"};
+const NAMES = {auto:"SOURCE",en:"ENGLISH",ur:"URDU",ar:"ARABIC",fr:"FRENCH",de:"GERMAN",es:"SPANISH",it:"ITALIAN",pt:"PORTUGUESE",ru:"RUSSIAN",zh:"CHINESE",ja:"JAPANESE",ko:"KOREAN",hi:"HINDI",tr:"TURKISH",nl:"DUTCH",pl:"POLISH",sv:"SWEDISH",id:"INDONESIAN",th:"THAI",vi:"VIETNAMESE",fa:"PERSIAN",he:"HEBREW",bn:"BENGALI"};
+
+const srcSel = document.getElementById('srcLang');
+const tgtSel = document.getElementById('tgtLang');
+const srcTA  = document.getElementById('sourceText');
+const resultEl = document.getElementById('resultText');
+let currentUtterance = null, speakingKey = null;
+
+function syncUI(){
+  const s = srcSel.value, t = tgtSel.value;
+  document.getElementById('srcFlag').textContent = FLAGS[s];
+  document.getElementById('tgtFlag').textContent = FLAGS[t];
+  document.getElementById('srcPanelFlag').textContent = FLAGS[s];
+  document.getElementById('tgtPanelFlag').textContent = FLAGS[t];
+  document.getElementById('srcPanelName').textContent = NAMES[s]||s.toUpperCase();
+  document.getElementById('tgtPanelName').textContent = NAMES[t]||t.toUpperCase();
+  document.getElementById('swapBtn').disabled = s === 'auto';
+}
+
+srcSel.addEventListener('change', syncUI);
+tgtSel.addEventListener('change', syncUI);
+
+srcTA.addEventListener('input', function(){
+  const n = this.value.length;
+  document.getElementById('charCount').textContent = n + ' / 2000';
+  document.getElementById('translateBtn').disabled = n === 0;
+  document.getElementById('srcSpeakBtn').disabled = n === 0;
+});
+
+srcTA.addEventListener('keydown', e => {
+  if((e.ctrlKey||e.metaKey) && e.key==='Enter') doTranslate();
+});
+
+document.getElementById('swapBtn').addEventListener('click', ()=>{
+  if(srcSel.value==='auto') return;
+  const tmp = srcSel.value;
+  srcSel.value = tgtSel.value;
+  tgtSel.value = tmp;
+  const tmpTxt = srcTA.value;
+  srcTA.value = resultEl.textContent;
+  resultEl.textContent = tmpTxt;
+  srcTA.dispatchEvent(new Event('input'));
+  syncUI();
+  if(resultEl.textContent) showResult(resultEl.textContent);
+});
+
+async function doTranslate(){
+  const text = srcTA.value.trim();
+  if(!text) return;
+
+  setLoading(true);
+  hideError();
+
+  const sourceLang = srcSel.value === 'auto' ? 'auto' : srcSel.value;
+  const targetLang = tgtSel.value;
+  const targetName = NAMES[targetLang] || targetLang;
+  const sourceName = sourceLang === 'auto' ? 'auto-detected language' : (NAMES[sourceLang] || sourceLang);
+
+  try {
+    const prompt = sourceLang === 'auto'
+      ? `Translate the following text to ${targetName}. Reply with only the translated text, nothing else:\n\n${text}`
+      : `Translate the following text from ${sourceName} to ${targetName}. Reply with only the translated text, nothing else:\n\n${text}`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const data = await res.json();
+    const translatedText = data.content?.[0]?.text?.trim();
+    if (!translatedText) throw new Error("Empty response from API.");
+    showResult(translatedText);
+  } catch (err) {
+    showError(err.message || "Translation failed.");
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('loadingState').style.display = 'none';
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on){
+  document.getElementById('spin').style.display = on?'block':'none';
+  document.getElementById('btnLabel').textContent = on?'Translating…':'Translate →';
+  document.getElementById('translateBtn').disabled = on;
+  const hasResult = resultEl.textContent.trim().length > 0;
+  document.getElementById('emptyState').style.display = on?'none':(hasResult?'none':'flex');
+  document.getElementById('loadingState').style.display = on?'flex':'none';
+  if(on) resultEl.style.display='none';
+}
+
+function showResult(text){
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('loadingState').style.display='none';
+  resultEl.textContent = text;
+  resultEl.style.display = 'block';
+  document.getElementById('readyDot').style.display='inline-block';
+  document.getElementById('tgtSpeakBtn').disabled=false;
+  document.getElementById('copyBtn').disabled=false;
+}
+
+function speak(key){
+  const text = key==='src' ? srcTA.value : resultEl.textContent;
+  let code = key==='src' ? (srcSel.value==='auto'?'en':srcSel.value) : tgtSel.value;
+  
+  const btn = document.getElementById(key==='src'?'srcSpeakBtn':'tgtSpeakBtn');
+  const other = document.getElementById(key==='src'?'tgtSpeakBtn':'srcSpeakBtn');
+  
+  if(!text.trim()) return;
+
+  if(speakingKey === key){
+    window.speechSynthesis.cancel();
+    speakingKey = null; 
+    resetBtn(btn); 
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  resetBtn(other);
+  
+  speakingKey = key; 
+  setPlayingBtn(btn);
+
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = code;
+  currentUtterance.rate = 0.95;
+
+  currentUtterance.onend = () => {
+    speakingKey = null;
+    resetBtn(btn);
+  };
+
+  currentUtterance.onerror = (event) => {
+    console.error("SpeechSynthesis Error:", event);
+    showError("Speech synthesis failed. Verify browser audio output options.");
+    speakingKey = null;
+    resetBtn(btn);
+  };
+
+  window.speechSynthesis.speak(currentUtterance);
+
+  let r = setInterval(() => {
+    if (!window.speechSynthesis.speaking) {
+      clearInterval(r);
+    } else {
+      window.speechSynthesis.resume();
+    }
+  }, 8000);
+}
+
+function setPlayingBtn(btn){
+  btn.classList.add('playing');
+  btn.innerHTML=`<div class="waves"><span class="wb"></span><span class="wb"></span><span class="wb"></span></div> Stop`;
+}
+
+function resetBtn(btn){
+  btn.classList.remove('playing');
+  btn.innerHTML=`<span>🔊</span> Listen`;
+}
+
+function copyResult(){
+  const text=resultEl.textContent;
+  if(!text)return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const b=document.getElementById('copyBtn');
+    b.textContent='✓ Copied!';b.classList.add('done');
+    setTimeout(()=>{b.innerHTML='📋 Copy';b.classList.remove('done');},2200);
+  });
+}
+
+function showError(msg){
+  const e=document.getElementById('errorBar');
+  e.textContent='⚠ '+msg;e.style.display='block';
+}
+
+function hideError(){document.getElementById('errorBar').style.display='none';}
+
+if (typeof speechSynthesis !== 'undefined' && speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+}
+
+syncUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ Chatbot</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0a1a, #1a1040, #0a1628);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .container {
+    width: 100%; max-width: 720px;
+    display: flex; flex-direction: column; height: 92vh; max-height: 820px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, rgba(124,58,237,0.4), rgba(37,99,235,0.4));
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 18px 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .avatar {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; flex-shrink: 0;
+    box-shadow: 0 0 16px rgba(124,58,237,0.5);
+  }
+  .header-info h2 { color: #fff; font-size: 1.05rem; }
+  .header-info p { color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 2px; }
+  .online-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    margin-left: auto; flex-shrink: 0;
+  }
+  .topic-badge {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .topic-badge:hover, .topic-badge.active {
+    background: rgba(124,58,237,0.3);
+    border-color: #7c3aed;
+    color: #c4b5fd;
+  }
+  .topics-bar {
+    padding: 10px 20px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.15);
+  }
+  .topics-label { font-size: 0.73rem; color: rgba(255,255,255,0.35); align-self: center; margin-right: 2px; }
+
+  /* Messages */
+  .messages {
+    flex: 1; overflow-y: auto;
+    padding: 20px 20px 10px;
+    display: flex; flex-direction: column; gap: 14px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 5px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+  .msg { display: flex; gap: 10px; max-width: 88%; animation: fadeUp 0.25s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.bot  { align-self: flex-start; }
+
+  .msg-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+  }
+  .msg.bot .msg-avatar  { background: linear-gradient(135deg,#7c3aed,#2563eb); }
+  .msg.user .msg-avatar { background: linear-gradient(135deg,#059669,#0891b2); }
+
+  .bubble {
+    padding: 11px 15px; border-radius: 16px;
+    font-size: 0.92rem; line-height: 1.6; color: #e2e8f0;
+  }
+  .msg.bot  .bubble { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-top-left-radius: 4px; }
+  .msg.user .bubble { background: linear-gradient(135deg,#7c3aed,#2563eb); border-top-right-radius: 4px; }
+
+  .bubble .confidence {
+    display: inline-block; margin-top: 8px;
+    font-size: 0.72rem; color: rgba(255,255,255,0.4);
+    border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; width: 100%;
+  }
+  .conf-bar { height: 3px; border-radius: 2px; margin-top: 3px; background: rgba(255,255,255,0.1); }
+  .conf-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+
+  .suggestions {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    align-self: flex-start; max-width: 88%;
+  }
+  .sug-btn {
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    color: #c4b5fd; border-radius: 20px;
+    padding: 6px 14px; font-size: 0.8rem;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .sug-btn:hover { background: rgba(124,58,237,0.35); border-color: #7c3aed; }
+
+  .typing { display: flex; gap: 5px; align-items: center; padding: 14px 15px; }
+  .typing span {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #7c3aed; display: inline-block;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0); } 30% { transform:translateY(-6px); } }
+
+  /* Input */
+  .input-area {
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.2);
+    display: flex; gap: 12px; align-items: flex-end;
+  }
+  .input-wrap { flex: 1; position: relative; }
+  textarea#userInput {
+    width: 100%; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px; color: #fff;
+    font-family: inherit; font-size: 0.93rem;
+    padding: 12px 16px; resize: none;
+    min-height: 46px; max-height: 120px;
+    line-height: 1.5; transition: border-color 0.2s;
+  }
+  textarea#userInput:focus { outline: none; border-color: #7c3aed; }
+  textarea#userInput::placeholder { color: rgba(255,255,255,0.3); }
+  .send-btn {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: linear-gradient(135deg,#7c3aed,#2563eb);
+    border: none; color: #fff; font-size: 1.1rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(124,58,237,0.4);
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .send-btn:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(124,58,237,0.6); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="avatar">🤖</div>
+    <div class="header-info">
+      <h2>FAQ Assistant</h2>
+      <p>NLP-powered · Cosine Similarity Matching</p>
+    </div>
+    <div class="online-dot"></div>
+  </div>
+
+  <div class="topics-bar">
+    <span class="topics-label">Topic:</span>
+    <span class="topic-badge active" onclick="setTopic('tech')" id="tab-tech">💻 Tech Support</span>
+    <span class="topic-badge" onclick="setTopic('ecom')" id="tab-ecom">🛒 E-Commerce</span>
+    <span class="topic-badge" onclick="setTopic('health')" id="tab-health">🏥 Healthcare</span>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea id="userInput" rows="1" placeholder="Ask a question…"></textarea>
+    </div>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+// ─── FAQ DATABASE ────────────────────────────────────────────────────────────
+const faqDB = {
+  tech: [
+    { q:"How do I reset my password?", a:"Go to Settings → Account → Reset Password. Enter your email and check your inbox for a reset link. The link expires in 30 minutes." },
+    { q:"Why is my internet connection slow?", a:"Try restarting your router, check for background downloads, or run a speed test at fast.com. If the problem persists, contact your ISP." },
+    { q:"How do I update my software?", a:"On Windows: Settings → Windows Update → Check for Updates. On Mac: Apple Menu → System Preferences → Software Update." },
+    { q:"My device won't turn on, what should I do?", a:"Hold the power button for 10 seconds. If it doesn't respond, plug in the charger and wait 15 minutes before trying again." },
+    { q:"How do I clear my browser cache?", a:"Press Ctrl+Shift+Delete (Windows) or Cmd+Shift+Delete (Mac). Select 'All time' as the range and check 'Cached images and files', then click Clear." },
+    { q:"What is two-factor authentication?", a:"2FA adds a second verification step (like an SMS code or app notification) when logging in, making your account much more secure even if your password is stolen." },
+    { q:"How do I backup my data?", a:"Use cloud services like Google Drive, iCloud, or OneDrive. For local backup, connect an external drive and use your OS backup tool (Time Machine on Mac, Backup & Restore on Windows)." },
+    { q:"My screen is frozen, how do I fix it?", a:"Press Ctrl+Alt+Delete (Windows) or Cmd+Option+Esc (Mac) to open Task Manager or Force Quit. End the unresponsive application. If that fails, hold the power button to restart." },
+    { q:"How do I install an app?", a:"Visit your device's official app store (Google Play, App Store, or Microsoft Store), search for the app, and tap Install. Always download from official sources only." },
+    { q:"What should I do if I get a virus?", a:"Disconnect from the internet immediately, run a full scan with your antivirus software, and avoid entering passwords until the system is clean. Consider tools like Malwarebytes for deep scans." },
+  ],
+  ecom: [
+    { q:"How do I track my order?", a:"Log in to your account → Orders → select your order → click 'Track Shipment'. You'll also receive tracking updates via email." },
+    { q:"Can I cancel my order?", a:"Orders can be cancelled within 1 hour of placement. Go to Orders → select the order → Cancel Order. After shipping, you'll need to request a return." },
+    { q:"What is the return policy?", a:"We offer a 30-day return window for most items. Products must be unused and in original packaging. Go to Orders → Return Item to initiate the process." },
+    { q:"How long does delivery take?", a:"Standard shipping: 5–7 business days. Express shipping: 2–3 business days. Same-day delivery is available in select cities." },
+    { q:"What payment methods are accepted?", a:"We accept Visa, Mastercard, PayPal, Apple Pay, Google Pay, and bank transfers. Cash on delivery is available in select regions." },
+    { q:"How do I apply a promo code?", a:"Add items to your cart → proceed to Checkout → enter your promo code in the 'Discount Code' field → click Apply. The discount will reflect in your total." },
+    { q:"Is my payment information secure?", a:"Yes. We use 256-bit SSL encryption and never store full card details. All transactions are processed through PCI-DSS compliant payment gateways." },
+    { q:"How do I change my shipping address?", a:"If the order hasn't shipped yet, go to Orders → Edit Order → Update Address. Once shipped, contact support immediately to attempt a redirect." },
+    { q:"Can I exchange a product?", a:"Yes. Initiate a return for the original item and place a new order. In some regions, direct exchanges are available via our support team." },
+    { q:"How do I contact customer support?", a:"Live chat is available 24/7 on our website. You can also email support@store.com or call 1-800-555-0199 during business hours (9AM–6PM EST)." },
+  ],
+  health: [
+    { q:"How do I book an appointment?", a:"Log in to the patient portal → Appointments → Book New. Choose your preferred doctor, date, and time slot. You'll receive a confirmation SMS and email." },
+    { q:"Can I consult a doctor online?", a:"Yes! We offer video and chat consultations 24/7. Go to Teleconsultation → Start Consultation and a licensed doctor will be with you within minutes." },
+    { q:"How do I access my medical records?", a:"Visit the Patient Portal → Medical Records. You can view, download, or share your records securely with other healthcare providers." },
+    { q:"What insurance plans do you accept?", a:"We accept most major insurance plans including BlueCross, Aetna, Cigna, UnitedHealth, and Medicare/Medicaid. Contact billing for specific plan confirmation." },
+    { q:"How do I refill my prescription?", a:"Go to Prescriptions → Request Refill and select your medication. Your doctor will review and approve it within 24 hours. You can opt for home delivery or pharmacy pickup." },
+    { q:"What should I do in a medical emergency?", a:"Call 911 (or your local emergency number) immediately. Do not use this app for emergencies. Our nearest emergency facility address is listed under 'Emergency Info' in the app." },
+    { q:"How do I update my health information?", a:"Go to Profile → Health Information. Keep your medications, allergies, and conditions up to date so your doctor has accurate information during consultations." },
+    { q:"Is my health data private?", a:"Absolutely. All data is encrypted and stored in HIPAA-compliant servers. We never sell your data to third parties. You control who can access your records." },
+    { q:"How do I get my lab results?", a:"Lab results are uploaded to your Patient Portal within 24–48 hours. You'll receive a notification. Your doctor may follow up to explain results if needed." },
+    { q:"What is the cancellation policy for appointments?", a:"You can cancel or reschedule appointments up to 2 hours before the scheduled time at no charge. Late cancellations may incur a small fee." },
+  ]
+};
+
+// ─── NLP: TF-IDF + COSINE SIMILARITY (in-browser) ───────────────────────────
+function tokenize(text) {
+  return text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !stopwords.has(w));
+}
+
+const stopwords = new Set([
+  "i","me","my","we","our","you","your","he","she","they","it","its",
+  "a","an","the","is","are","was","were","be","been","being",
+  "have","has","had","do","does","did","will","would","could","should",
+  "may","might","can","to","of","in","on","at","for","with","about",
+  "by","from","up","out","or","and","but","if","as","this","that",
+  "what","how","when","where","why","who","which","there","here","not"
+]);
+
+function buildTFIDF(corpus) {
+  const tokenized = corpus.map(tokenize);
+  const N = tokenized.length;
+  const df = {};
+  tokenized.forEach(doc => new Set(doc).forEach(t => df[t] = (df[t]||0)+1));
+  return tokenized.map(doc => {
+    const tf = {};
+    doc.forEach(t => tf[t] = (tf[t]||0)+1);
+    const vec = {};
+    Object.keys(tf).forEach(t => {
+      vec[t] = (tf[t]/doc.length) * Math.log((N+1)/((df[t]||0)+1));
+    });
+    return vec;
+  });
+}
+
+function cosineSim(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let dot=0, magA=0, magB=0;
+  keys.forEach(k => {
+    const va=a[k]||0, vb=b[k]||0;
+    dot += va*vb; magA += va*va; magB += vb*vb;
+  });
+  return magA && magB ? dot/(Math.sqrt(magA)*Math.sqrt(magB)) : 0;
+}
+
+function queryVec(query, corpus) {
+  const tokens = tokenize(query);
+  const N = corpus.length;
+  const allTokenized = corpus.map(tokenize);
+  const df = {};
+  allTokenized.forEach(doc => new Set(doc).forEach(t => df[t]=(df[t]||0)+1));
+  const tf = {};
+  tokens.forEach(t => tf[t]=(tf[t]||0)+1);
+  const vec = {};
+  tokens.forEach(t => {
+    vec[t] = (tf[t]/tokens.length) * Math.log((N+1)/((df[t]||0)+1));
+  });
+  return vec;
+}
+
+function findBestMatch(userQ, faqs) {
+  const questions = faqs.map(f => f.q);
+  const tfidfVecs = buildTFIDF(questions);
+  const qVec = queryVec(userQ, questions);
+  let best = -1, bestIdx = 0;
+  tfidfVecs.forEach((vec, i) => {
+    const sim = cosineSim(qVec, vec);
+    if (sim > best) { best=sim; bestIdx=i; }
+  });
+  return { faq: faqs[bestIdx], score: best };
+}
+
+// ─── UI STATE ────────────────────────────────────────────────────────────────
+let currentTopic = 'tech';
+const topicGreets = {
+  tech:   "👋 Hi! I'm your **Tech Support** assistant. Ask me about passwords, devices, software, internet issues, and more!",
+  ecom:   "👋 Hi! I'm your **E-Commerce** assistant. Ask me about orders, returns, payments, delivery, and more!",
+  health: "👋 Hi! I'm your **Healthcare** assistant. Ask me about appointments, prescriptions, lab results, and more!"
+};
+const topicSuggestions = {
+  tech:   ["How do I reset my password?","Why is my internet slow?","How to clear cache?"],
+  ecom:   ["How do I track my order?","What's the return policy?","How to apply a promo code?"],
+  health: ["How do I book an appointment?","How do I get my lab results?","Is my data private?"]
+};
+
+function setTopic(t) {
+  currentTopic = t;
+  document.querySelectorAll('.topic-badge').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  clearMessages();
+  botGreet();
+}
+
+function clearMessages() {
+  document.getElementById('messages').innerHTML = '';
+}
+
+function appendMsg(role, html, conf=null) {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${role}`;
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = role==='bot' ? '🤖' : '👤';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = html;
+
+  if (conf !== null && role === 'bot') {
+    const pct = Math.round(conf*100);
+    const color = conf>0.5 ? '#4ade80' : conf>0.25 ? '#facc15' : '#f87171';
+    bub.innerHTML += `<div class="confidence">Match confidence: ${pct}%<div class="conf-bar"><div class="conf-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+  }
+
+  wrap.appendChild(av);
+  wrap.appendChild(bub);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showSuggestions() {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'suggestions';
+  topicSuggestions[currentTopic].forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'sug-btn';
+    btn.textContent = s;
+    btn.onclick = () => { document.getElementById('userInput').value=s; sendMessage(); };
+    wrap.appendChild(btn);
+  });
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot'; wrap.id = 'typing-indicator';
+  const av = document.createElement('div');
+  av.className = 'msg-avatar'; av.textContent = '🤖';
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  wrap.appendChild(av); wrap.appendChild(bub);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function botGreet() {
+  const greet = topicGreets[currentTopic].replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  setTimeout(() => {
+    appendMsg('bot', greet);
+    showSuggestions();
+  }, 200);
+}
+
+function sendMessage() {
+  const inp = document.getElementById('userInput');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  appendMsg('user', text.replace(/</g,'&lt;'));
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  document.getElementById('sendBtn').disabled = true;
+  showTyping();
+
+  setTimeout(() => {
+    removeTyping();
+    const faqs = faqDB[currentTopic];
+    const { faq, score } = findBestMatch(text, faqs);
+
+    let reply;
+    if (score < 0.05) {
+      reply = `I couldn't find a close match for that question in the <strong>${currentTopic}</strong> FAQ database. Try rephrasing, or switch topics above. You can also ask something like:`;
+      appendMsg('bot', reply, score);
+      showSuggestions();
+    } else {
+      reply = `<strong>Q: ${faq.q}</strong><br><br>${faq.a}`;
+      appendMsg('bot', reply, score);
+    }
+    document.getElementById('sendBtn').disabled = false;
+  }, 800 + Math.random()*400);
+}
+
+// Auto-resize textarea
+document.getElementById('userInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+document.getElementById('userInput').addEventListener('keydown', e => {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// Init
+botGreet();
+</script>
+</body>
+</html>

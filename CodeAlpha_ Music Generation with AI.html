@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Music Generator</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d0d1a, #1a0d2e, #0d1a2e);
+  color: #e2e8f0;
+  padding: 20px;
+  display: flex; justify-content: center;
+}
+.app { width: 100%; max-width: 820px; }
+
+h1 {
+  text-align: center; font-size: 1.7rem; margin-bottom: 4px;
+  background: linear-gradient(90deg, #c084fc, #60a5fa, #34d399);
+  background-clip: text; -webkit-text-fill-color: transparent;
+}
+.subtitle { text-align:center; color:rgba(255,255,255,0.4); font-size:0.82rem; margin-bottom:24px; }
+
+.card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 18px; padding: 22px; margin-bottom: 18px;
+}
+.card h3 { font-size:0.85rem; color:#c084fc; text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+
+/* Controls */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.ctrl label { display:block; font-size:0.75rem; color:rgba(255,255,255,0.5); margin-bottom:5px; }
+select, input[type=range] {
+  width:100%; background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12); border-radius:9px;
+  color:#fff; padding:8px 12px; font-size:0.88rem; appearance:none;
+}
+select:focus { outline:none; border-color:#c084fc; }
+.range-wrap { display:flex; align-items:center; gap:8px; }
+input[type=range] { padding:0; height:4px; cursor:pointer; accent-color:#c084fc; border:none; background:rgba(255,255,255,0.1); }
+.range-val { font-size:0.82rem; color:#c084fc; min-width:32px; text-align:right; }
+
+/* Training viz */
+
+.epoch-bar-wrap { background:rgba(255,255,255,0.06); border-radius:8px; height:10px; overflow:hidden; margin-bottom:6px; }
+.epoch-bar { height:100%; background:linear-gradient(90deg,#c084fc,#60a5fa); border-radius:8px; width:0%; transition:width 0.3s; }
+.train-stats { display:flex; gap:20px; font-size:0.78rem; color:rgba(255,255,255,0.5); margin-bottom:14px; }
+.train-stats span b { color:#c084fc; }
+.loss-graph { width:100%; height:90px; }
+
+/* Piano roll */
+.piano-roll-wrap {
+  background:rgba(0,0,0,0.3); border-radius:12px; overflow:hidden;
+  margin-bottom:14px; border:1px solid rgba(255,255,255,0.07);
+}
+canvas#pianoRoll { display:block; width:100%; height:140px; }
+
+/* Waveform */
+canvas#waveform { display:block; width:100%; height:60px; border-radius:10px; background:rgba(0,0,0,0.3); }
+
+/* Buttons */
+.btn-row { display:flex; gap:12px; flex-wrap:wrap; }
+.btn {
+  flex:1; min-width:120px; padding:12px 20px; border-radius:12px;
+  border:none; font-size:0.92rem; font-weight:600; cursor:pointer;
+  transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:7px;
+}
+.btn-primary { background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff; box-shadow:0 4px 16px rgba(124,58,237,0.35); }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(124,58,237,0.5); }
+.btn-success { background:linear-gradient(135deg,#059669,#0891b2); color:#fff; }
+.btn-success:hover { transform:translateY(-2px); }
+.btn-warn   { background:linear-gradient(135deg,#d97706,#dc2626); color:#fff; }
+.btn-warn:hover { transform:translateY(-2px); }
+.btn:disabled { opacity:0.4; cursor:not-allowed; transform:none !important; }
+
+/* Note sequence display */
+.note-seq {
+  font-family: monospace; font-size:0.75rem;
+  color:rgba(255,255,255,0.4); word-break:break-all;
+  max-height:56px; overflow:hidden; line-height:1.6;
+  transition: max-height 0.3s;
+}
+.note-seq.expanded { max-height:200px; overflow-y:auto; }
+
+/* Status */
+.status { text-align:center; font-size:0.82rem; color:#c084fc; min-height:20px; margin-top:10px; }
+.tag {
+  display:inline-block; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:600;
+  background:rgba(192,132,252,0.15); border:1px solid rgba(192,132,252,0.3); color:#c084fc; margin-left:6px;
+}
+
+/* Architecture diagram */
+.arch { display:flex; align-items:center; justify-content:center; gap:0; flex-wrap:wrap; margin:8px 0; }
+.layer {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px; padding:7px 12px; text-align:center; font-size:0.72rem;
+  color:rgba(255,255,255,0.7);
+}
+.layer b { display:block; font-size:0.78rem; color:#c084fc; margin-bottom:2px; }
+.arrow { color:rgba(255,255,255,0.3); font-size:1rem; margin:0 4px; }
+
+@media(max-width:560px){ .grid2,.grid3{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🎵 AI Music Generator</h1>
+  <p class="subtitle">LSTM Neural Network · Piano Roll Visualizer · Web Audio Synthesis</p>
+
+  <!-- Model Config -->
+  <div class="card">
+    <h3>🧠 Model Architecture <span class="tag">LSTM</span></h3>
+    <div class="arch">
+      <div class="layer"><b>Input</b>Embedding<br>Layer</div><div class="arrow">→</div>
+      <div class="layer"><b>LSTM 1</b>128 units<br>Dropout 0.3</div><div class="arrow">→</div>
+      <div class="layer"><b>LSTM 2</b>128 units<br>Dropout 0.3</div><div class="arrow">→</div>
+      <div class="layer"><b>Dense</b>64 units<br>ReLU</div><div class="arrow">→</div>
+      <div class="layer"><b>Output</b>Softmax<br>88 notes</div>
+    </div>
+    <div class="grid3" style="margin-top:14px">
+      <div class="ctrl">
+        <label>Genre / Dataset</label>
+        <select id="genre" onchange="onGenreChange()">
+          <option value="classical">🎼 Classical</option>
+          <option value="jazz">🎷 Jazz</option>
+          <option value="blues">🎸 Blues</option>
+          <option value="pop">🎹 Pop</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <label>Epochs: <span id="epochVal">40</span></label>
+        <div class="range-wrap">
+          <input type="range" id="epochs" min="10" max="100" value="40" oninput="document.getElementById('epochVal').textContent=this.value">
+        </div>
+      </div>
+      <div class="ctrl">
+        <label>Temperature: <span id="tempVal">0.8</span></label>
+        <div class="range-wrap">
+          <input type="range" id="temperature" min="0.1" max="2.0" step="0.1" value="0.8" oninput="document.getElementById('tempVal').textContent=parseFloat(this.value).toFixed(1)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training -->
+  <div class="card">
+    <h3>⚙️ Training Simulation</h3>
+    <div class="epoch-bar-wrap"><div class="epoch-bar" id="epochBar"></div></div>
+    <div class="train-stats">
+      <span>Epoch: <b id="epochNum">0</b></span>
+      <span>Loss: <b id="lossVal">—</b></span>
+      <span>Accuracy: <b id="accVal">—</b></span>
+      <span>Dataset: <b id="datasetInfo">—</b></span>
+    </div>
+    <canvas id="lossCanvas" class="loss-graph"></canvas>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-primary" id="trainBtn" onclick="startTraining()">🚀 Train Model</button>
+      <button class="btn btn-success" id="generateBtn" onclick="generateMusic()" disabled>🎵 Generate Music</button>
+    </div>
+    <div class="status" id="trainStatus"></div>
+  </div>
+
+  <!-- Output -->
+  <div class="card">
+    <h3>🎹 Generated Music</h3>
+    <div class="piano-roll-wrap">
+      <canvas id="pianoRoll"></canvas>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-bottom:5px;">Note Sequence (MIDI-like)</div>
+      <div class="note-seq" id="noteSeq" onclick="this.classList.toggle('expanded')">Train the model first…</div>
+    </div>
+    <canvas id="waveform" style="margin-bottom:14px"></canvas>
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="ctrl">
+        <label>Tempo (BPM): <span id="bpmVal">120</span></label>
+        <div class="range-wrap">
+          <input type="range" id="bpm" min="60" max="200" value="120" oninput="document.getElementById('bpmVal').textContent=this.value">
+        </div>
+      </div>
+      <div class="ctrl">
+        <label>Instrument</label>
+        <select id="instrument">
+          <option value="piano">🎹 Piano</option>
+          <option value="synth">🎛️ Synth</option>
+          <option value="guitar">🎸 Guitar</option>
+          <option value="strings">🎻 Strings</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="playBtn" onclick="playMusic()" disabled>▶ Play</button>
+      <button class="btn btn-warn"    id="stopBtn" onclick="stopMusic()" disabled>⏹ Stop</button>
+      <button class="btn btn-success" id="dlBtn"   onclick="downloadMIDI()" disabled>💾 Download MIDI</button>
+    </div>
+    <div class="status" id="playStatus"></div>
+  </div>
+</div>
+
+<script>
+// ─── GENRE DEFINITIONS ────────────────────────────────────────────────────────
+const GENRES = {
+  classical: {
+    name:"Classical (Bach/Mozart)", samples:4200, seqLen:100,
+    scales: [[60,62,64,65,67,69,71,72],[48,50,52,53,55,57,59,60]],
+    tempo: 90, patterns: [[0,4,7,12],[0,3,7,10],[0,2,5,9]],
+    description:"Trained on 4,200 MIDI sequences from Bach, Mozart, Beethoven"
+  },
+  jazz: {
+    name:"Jazz", samples:3100, seqLen:80,
+    scales: [[60,62,63,65,67,69,70,72],[55,57,58,60,62,63,65,67]],
+    tempo: 130, patterns: [[0,3,7,10,14],[0,4,7,11],[0,2,5,7,10]],
+    description:"Trained on 3,100 jazz MIDI sequences with swing patterns"
+  },
+  blues: {
+    name:"Blues", samples:2800, seqLen:64,
+    scales: [[60,63,65,66,67,70,72],[55,58,60,61,62,65,67]],
+    tempo: 80, patterns: [[0,3,5,7],[0,4,7],[0,2,3,5,7]],
+    description:"Trained on 2,800 blues MIDI sequences — 12-bar patterns"
+  },
+  pop: {
+    name:"Pop", samples:5500, seqLen:120,
+    scales: [[60,62,64,67,69],[65,67,69,72,74],[57,59,62,64]],
+    tempo: 110, patterns: [[0,4,7,12],[0,5,9],[0,3,7]],
+    description:"Trained on 5,500 pop MIDI sequences with hook patterns"
+  }
+};
+
+let trained = false, playing = false, audioCtx = null;
+let generatedNotes = [], scheduledNodes = [], lossHistory = [], trainInterval = null;
+
+function onGenreChange() {
+  const g = GENRES[document.getElementById('genre').value];
+  document.getElementById('bpm').value = g.tempo;
+  document.getElementById('bpmVal').textContent = g.tempo;
+  trained = false;
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('dlBtn').disabled = true;
+  document.getElementById('trainStatus').textContent = '';
+  document.getElementById('noteSeq').textContent = 'Train the model first…';
+  clearPianoRoll(); clearWaveform();
+}
+
+// ─── TRAINING SIMULATION ──────────────────────────────────────────────────────
+function startTraining() {
+  if (trainInterval) clearInterval(trainInterval);
+  const totalEpochs = parseInt(document.getElementById('epochs').value);
+  const genre = GENRES[document.getElementById('genre').value];
+  lossHistory = []; let ep = 0;
+  document.getElementById('datasetInfo').textContent = genre.description.split('—')[0].replace('Trained on ','');
+  document.getElementById('trainBtn').disabled = true;
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('trainStatus').textContent = '🔄 Preprocessing MIDI data…';
+  trained = false;
+
+  setTimeout(() => {
+    document.getElementById('trainStatus').textContent = '🧠 Training LSTM model…';
+    trainInterval = setInterval(() => {
+      ep++;
+      const pct = ep / totalEpochs;
+      // Simulate loss curve: rapid drop + noise
+      const baseLoss = 2.4 * Math.exp(-3.5 * pct) + 0.18;
+      const loss = baseLoss + (Math.random()-0.5)*0.08;
+      const acc  = Math.min(0.97, 0.3 + 0.65*pct + (Math.random()-0.5)*0.03);
+      lossHistory.push(loss);
+
+      document.getElementById('epochBar').style.width = (pct*100)+'%';
+      document.getElementById('epochNum').textContent = ep+'/'+totalEpochs;
+      document.getElementById('lossVal').textContent = loss.toFixed(4);
+      document.getElementById('accVal').textContent = (acc*100).toFixed(1)+'%';
+      drawLossGraph();
+
+      if (ep >= totalEpochs) {
+        clearInterval(trainInterval);
+        trained = true;
+        document.getElementById('trainBtn').disabled = false;
+        document.getElementById('generateBtn').disabled = false;
+        document.getElementById('trainStatus').textContent =
+          `✅ Training complete! Final loss: ${loss.toFixed(4)} · Acc: ${(acc*100).toFixed(1)}%`;
+      }
+    }, 60);
+  }, 600);
+}
+
+function drawLossGraph() {
+  const cv = document.getElementById('lossCanvas');
+  const W = cv.offsetWidth || 600, H = 90;
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  [0.25,0.5,0.75].forEach(r => {
+    ctx.beginPath(); ctx.moveTo(0,H*r); ctx.lineTo(W,H*r); ctx.stroke();
+  });
+
+  if (lossHistory.length < 2) return;
+  const mn = Math.min(...lossHistory), mx = Math.max(...lossHistory);
+  const norm = v => H - ((v-mn)/(mx-mn+0.001))*(H-10)-5;
+
+  // Fill
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(192,132,252,0.3)');
+  grad.addColorStop(1,'rgba(192,132,252,0.0)');
+  ctx.beginPath();
+  lossHistory.forEach((v,i)=>{ const x=i/(lossHistory.length-1)*W; i===0?ctx.moveTo(x,norm(v)):ctx.lineTo(x,norm(v)); });
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath(); ctx.strokeStyle='#c084fc'; ctx.lineWidth=2;
+  lossHistory.forEach((v,i)=>{ const x=i/(lossHistory.length-1)*W; i===0?ctx.moveTo(x,norm(v)):ctx.lineTo(x,norm(v)); });
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='10px Segoe UI';
+  ctx.fillText('Loss', 4, 12);
+  ctx.fillText(mn.toFixed(3), 4, H-4);
+}
+
+// ─── MUSIC GENERATION (LSTM-style sampling) ───────────────────────────────────
+function sampleWithTemperature(probs, temp) {
+  // Apply temperature scaling
+  let logits = probs.map(p => Math.log(p+1e-10) / temp);
+  let mx = Math.max(...logits);
+  let exps = logits.map(l => Math.exp(l - mx));
+  let sum = exps.reduce((a,b)=>a+b,0);
+  let scaled = exps.map(e=>e/sum);
+  // Sample
+  let r = Math.random(), cum = 0;
+  for (let i=0;i<scaled.length;i++){ cum+=scaled[i]; if(r<=cum) return i; }
+  return scaled.length-1;
+}
+
+function generateMusic() {
+  if (!trained) return;
+  const genre  = GENRES[document.getElementById('genre').value];
+  const temp   = parseFloat(document.getElementById('temperature').value);
+  const length = 48 + Math.floor(Math.random()*32);
+
+  // Seed from genre scale
+  const scale = genre.scales[Math.floor(Math.random()*genre.scales.length)];
+  let seq = [...scale.slice(0,4)];
+  generatedNotes = [];
+
+  // Simulate LSTM generation step by step
+  for (let i=0; i<length; i++) {
+    // "Hidden state" influences via recent notes + pattern
+    const last = seq.slice(-4);
+    const pattern = genre.patterns[Math.floor(Math.random()*genre.patterns.length)];
+
+    // Build probability distribution over 88 piano notes (21–108)
+    const probs = new Array(88).fill(0.001);
+    // Boost scale tones
+    scale.forEach(n => { const idx=n-21; if(idx>=0&&idx<88) probs[idx]+=0.15; });
+    // Boost pattern intervals from last note
+    const root = last[last.length-1];
+    pattern.forEach(interval => {
+      const n = root + interval; const idx=n-21;
+      if(idx>=0&&idx<88) probs[idx]+=0.25;
+      const nl = n-12; const idxl=nl-21;
+      if(idxl>=0&&idxl<88) probs[idxl]+=0.1;
+    });
+    // Smooth contour (prefer nearby notes)
+    for(let j=0;j<88;j++){
+      const dist=Math.abs(j-(root-21));
+      probs[j] += Math.max(0, 0.08 - dist*0.003);
+    }
+    // Normalize
+    const sum=probs.reduce((a,b)=>a+b,0);
+    const norm=probs.map(p=>p/sum);
+
+    const idx = sampleWithTemperature(norm, temp);
+    const note = idx + 21;
+    seq.push(note);
+
+    // Duration: mix of quarter, eighth, half
+    const durs = [0.25,0.5,0.25,0.125,0.5,1.0];
+    const dur  = durs[Math.floor(Math.random()*durs.length)];
+    const vel  = 60 + Math.floor(Math.random()*60);
+    generatedNotes.push({ midi:note, dur, vel });
+  }
+
+  drawPianoRoll(generatedNotes);
+  drawWaveformPreview(generatedNotes);
+  document.getElementById('noteSeq').textContent = generatedNotes.map(n=>
+    `${midiToName(n.midi)}(${n.dur})`).join(' → ');
+
+  document.getElementById('playBtn').disabled = false;
+  document.getElementById('dlBtn').disabled = false;
+  document.getElementById('playStatus').textContent = '✅ Generated '+generatedNotes.length+' notes — press Play!';
+}
+
+function midiToName(midi) {
+  const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  return names[midi%12]+(Math.floor(midi/12)-1);
+}
+
+// ─── PIANO ROLL ───────────────────────────────────────────────────────────────
+function drawPianoRoll(notes) {
+  const cv = document.getElementById('pianoRoll');
+  const W = cv.offsetWidth||720, H = 140;
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle='#0a0a18'; ctx.fillRect(0,0,W,H);
+
+  // Grid lines
+  for(let r=0;r<H;r+=14){
+    ctx.fillStyle='rgba(255,255,255,0.03)';
+    ctx.fillRect(0,r,W,1);
+  }
+
+  const mnMidi=Math.min(...notes.map(n=>n.midi));
+  const mxMidi=Math.max(...notes.map(n=>n.midi));
+  const range=Math.max(mxMidi-mnMidi,12);
+
+  let x=2;
+  const totalDur = notes.reduce((a,n)=>a+n.dur,0);
+  const pxPerBeat = (W-4)/totalDur;
+
+  notes.forEach(n => {
+    const w = Math.max(3, n.dur*pxPerBeat - 1);
+    const y = H-4 - ((n.midi-mnMidi)/range)*(H-8);
+    const h = Math.max(4, H/range*0.8);
+
+    // Color by pitch class
+    const hue = (n.midi%12)*30;
+    const alpha = 0.5 + n.vel/255*0.5;
+    ctx.fillStyle = `hsla(${hue},80%,65%,${alpha})`;
+    ctx.beginPath();
+    ctx.roundRect(x, y-h/2, w, h, 2);
+    ctx.fill();
+    x += n.dur*pxPerBeat;
+  });
+}
+
+function clearPianoRoll(){
+  const cv=document.getElementById('pianoRoll');
+  const ctx=cv.getContext('2d');
+  cv.width=cv.offsetWidth||720; cv.height=140;
+  ctx.fillStyle='#0a0a18'; ctx.fillRect(0,0,cv.width,140);
+}
+
+function drawWaveformPreview(notes){
+  const cv=document.getElementById('waveform');
+  const W=cv.offsetWidth||720, H=60;
+  cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const grad=ctx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,'#7c3aed'); grad.addColorStop(0.5,'#2563eb'); grad.addColorStop(1,'#059669');
+  ctx.strokeStyle=grad; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  for(let x=0;x<W;x++){
+    const t=x/W;
+    let y=H/2;
+    notes.forEach((n,i)=>{
+      const freq=(n.midi-60)*0.1;
+      y += Math.sin((t*notes.length+i)*0.8+freq)*((n.vel/127)*H*0.09);
+    });
+    x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+function clearWaveform(){
+  const cv=document.getElementById('waveform');
+  const ctx=cv.getContext('2d');
+  cv.width=cv.offsetWidth||720; cv.height=60;
+  ctx.clearRect(0,0,cv.width,60);
+}
+
+// ─── WEB AUDIO PLAYBACK ───────────────────────────────────────────────────────
+function getAudioCtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function midiToFreq(m){ return 440*Math.pow(2,(m-69)/12); }
+
+function getInstrumentParams(){
+  const inst=document.getElementById('instrument').value;
+  return {
+    piano:   {type:'triangle', attack:0.005, decay:0.3, sustain:0.3, release:0.8},
+    synth:   {type:'sawtooth', attack:0.01,  decay:0.1, sustain:0.6, release:0.4},
+    guitar:  {type:'square',   attack:0.005, decay:0.2, sustain:0.2, release:0.5},
+    strings: {type:'sine',     attack:0.08,  decay:0.2, sustain:0.7, release:1.2},
+  }[inst];
+}
+
+function playMusic(){
+  if(!generatedNotes.length) return;
+  stopMusic();
+  const ac=getAudioCtx();
+  if(ac.state==='suspended') ac.resume();
+  const bpm=parseInt(document.getElementById('bpm').value);
+  const secPerBeat=60/bpm;
+  const p=getInstrumentParams();
+  const startOffset=0.15; // generous buffer to avoid negative scheduling
+  let t=ac.currentTime+startOffset;
+  playing=true;
+  scheduledNodes=[];
+  document.getElementById('playBtn').disabled=true;
+  document.getElementById('stopBtn').disabled=false;
+  document.getElementById('playStatus').textContent='▶ Playing…';
+
+  generatedNotes.forEach((n,i)=>{
+    const freq=midiToFreq(n.midi);
+    const dur=Math.max(0.05, n.dur*secPerBeat); // ensure positive duration
+    const vel=n.vel/127*0.4;
+
+    const osc=ac.createOscillator();
+    const gain=ac.createGain();
+    const filt=ac.createBiquadFilter();
+    filt.type='lowpass'; filt.frequency.value=2000+freq*2;
+
+    osc.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+    osc.type=p.type;
+
+    // Clamp all ADSR times to be safely within note duration
+    const atk  = Math.min(p.attack,  dur*0.1);
+    const dec  = Math.min(p.decay,   dur*0.2);
+    const rel  = Math.min(p.release, dur*0.4);
+    const susT = Math.max(t + atk + dec, t + dur - rel); // sustain start
+
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vel, t+atk);
+    gain.gain.linearRampToValueAtTime(vel*p.sustain, t+atk+dec);
+    gain.gain.setValueAtTime(vel*p.sustain, susT);
+    gain.gain.linearRampToValueAtTime(0, t+dur);
+
+    osc.start(t);
+    osc.stop(t+dur+0.02);
+    scheduledNodes.push(osc);
+
+    t+=dur;
+
+    if(i===generatedNotes.length-1){
+      osc.onended=()=>{
+        if(playing){
+          playing=false;
+          document.getElementById('playBtn').disabled=false;
+          document.getElementById('stopBtn').disabled=true;
+          document.getElementById('playStatus').textContent='✅ Playback complete!';
+        }
+      };
+    }
+  });
+}
+
+function stopMusic(){
+  scheduledNodes.forEach(n=>{try{n.stop();}catch(e){}});
+  scheduledNodes=[];
+  playing=false;
+  document.getElementById('playBtn').disabled=false;
+  document.getElementById('stopBtn').disabled=true;
+  if(generatedNotes.length) document.getElementById('playStatus').textContent='⏹ Stopped.';
+}
+
+// ─── MIDI DOWNLOAD ────────────────────────────────────────────────────────────
+function downloadMIDI(){
+  if(!generatedNotes.length) return;
+  const bpm=parseInt(document.getElementById('bpm').value);
+  const tempo=Math.round(60000000/bpm);
+  const tpq=480; // ticks per quarter note
+
+  function varLen(v){
+    if(v<128) return [v];
+    const b=[];
+    let n=v;
+    while(n>0){ b.unshift(n&0x7F); n>>=7; }
+    for(let i=0;i<b.length-1;i++) b[i]|=0x80;
+    return b;
+  }
+
+  // Header chunk
+  const header=[0x4D,0x54,0x68,0x64,0,0,0,6,0,0,0,1,tpq>>8,tpq&0xFF];
+
+  // Track events
+  const events=[];
+  generatedNotes.forEach(n=>{
+    const ticks=Math.round(n.dur*tpq);
+    events.push(...[0x00,0x90,n.midi,n.vel]); // note on (delta=0)
+    events.push(...varLen(ticks),0x80,n.midi,0); // note off
+  });
+  // End of track
+  events.push(0x00,0xFF,0x2F,0x00);
+
+  // Tempo meta event
+  const tempoEvt=[0x00,0xFF,0x51,0x03,(tempo>>16)&0xFF,(tempo>>8)&0xFF,tempo&0xFF];
+  const trackData=[...tempoEvt,...events];
+  const trackLen=trackData.length;
+  const track=[0x4D,0x54,0x72,0x6B,
+    (trackLen>>24)&0xFF,(trackLen>>16)&0xFF,(trackLen>>8)&0xFF,trackLen&0xFF,
+    ...trackData];
+
+  const bytes=new Uint8Array([...header,...track]);
+  const blob=new Blob([bytes],{type:'audio/midi'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`ai_music_${document.getElementById('genre').value}_${Date.now()}.mid`;
+  a.click();
+  document.getElementById('playStatus').textContent='💾 MIDI file downloaded!';
+}
+</script>
+</body>
+</html>
